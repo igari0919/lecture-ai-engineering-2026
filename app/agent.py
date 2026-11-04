@@ -42,7 +42,7 @@ agent = Agent(instructions=INSTRUCTIONS)
 agent.tool_plain(tools.search_glossary)
 agent.tool_plain(tools.get_lecture_summary)
 
-# TODO(第3回 演習): tools.py に make_quiz を作り、ここで登録しよう
+agent.tool_plain(tools.make_quiz)
 
 # 第5回: 使う MCP サーバーの設定ファイル。Claude Desktop や Cursor と同じ "mcpServers" 形式
 MCP_CONFIG = Path(__file__).resolve().parent / "mcp_servers.json"
@@ -109,6 +109,84 @@ def print_trace(result) -> None:
     print(f"[usage] {result.usage}")
 
 
+def quiz_log_details(result) -> tuple[int | None, str | None]:
+    """会話中に生成されたクイズの回・問題・答えを抽出する。"""
+    returns = {
+        part.tool_call_id: part.content
+        for message in result.all_messages()
+        for part in message.parts
+        if isinstance(part, ToolReturnPart) and part.tool_name == "make_quiz"
+    }
+    for message in result.all_messages():
+        for part in message.parts:
+            if not isinstance(part, ToolCallPart) or part.tool_name != "make_quiz":
+                continue
+            args = part.args
+            if isinstance(args, str):
+                args = json.loads(args)
+            content = returns.get(part.tool_call_id)
+            if isinstance(content, str):
+                content = json.loads(content)
+            if isinstance(content, dict):
+                quiz = f"{content['question']} 答え: {content['answer']}"
+            else:
+                quiz = str(content)
+            return args["lecture"], quiz
+    return None, None
+
+
+def run_interactive_chat(
+    target: Agent,
+    model: GoogleModel,
+    trace: bool = False,
+    initial_question: str | None = None,
+) -> None:
+    """質問を繰り返し受け付け、会話履歴を次の質問に渡す。"""
+    message_history = None
+    while True:
+        try:
+            question = (
+                initial_question
+                if initial_question is not None
+                else input("あなた: ")
+            )
+        except (EOFError, KeyboardInterrupt):
+            print()
+            break
+
+        if initial_question is not None:
+            print(f"あなた: {question}")
+            initial_question = None
+        if not question.strip():
+            break
+
+        try:
+            result = target.run_sync(
+                question,
+                model=model,
+                message_history=message_history,
+            )
+        except ModelHTTPError as e:
+            print(api_error_message(e.status_code, str(e.body)[:200]))
+            raise SystemExit(1)
+
+        print(result.output)
+        confirmation = input("この会話ログを保存しますか？ [y/N]: ").strip().casefold()
+        if confirmation in {"y", "yes"}:
+            quiz_lecture, quiz_content = quiz_log_details(result)
+            print(
+                tools.save_learning_log(
+                    question=question,
+                    answer=str(result.output),
+                    quiz_lecture=quiz_lecture,
+                    quiz_content=quiz_content,
+                )
+            )
+        message_history = result.all_messages()
+        if trace:
+            print_trace(result)
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description="学習支援エージェントに質問する")
     parser.add_argument("question", nargs="?")
@@ -121,20 +199,17 @@ def main() -> None:
     if args.list_tools:
         print_tools(target)
         return
-    if not args.question:
-        parser.error("質問を指定してください")
 
     print(f"[model] {MODEL}")
     if args.mcp:
         print("[tools] MCP サーバー（app/mcp_servers.json）")
-    try:
-        result = target.run_sync(args.question, model=build_model())
-    except ModelHTTPError as e:
-        print(api_error_message(e.status_code, str(e.body)[:200]))
-        raise SystemExit(1)
-    print(result.output)
-    if args.trace:
-        print_trace(result)
+    model = build_model()
+    run_interactive_chat(
+        target,
+        model,
+        trace=args.trace,
+        initial_question=args.question,
+    )
 
 
 if __name__ == "__main__":

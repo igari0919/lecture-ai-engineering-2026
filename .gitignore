@@ -8,7 +8,8 @@ __pycache__/
 .env.*
 
 # 個人の学習ログ（第3回の宿題で作成）は共有しない
-learning_log/
+learning_log/*
+!learning_log/.gitkeep
 
 # macOS
 .DS_Store
