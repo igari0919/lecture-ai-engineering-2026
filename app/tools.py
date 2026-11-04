@@ -5,10 +5,13 @@
 """
 
 import json
+import random
+from datetime import datetime
 from functools import cache
 from pathlib import Path
 
 DATA_DIR = Path(__file__).resolve().parent.parent / "data"
+LEARNING_LOG_DIR = Path(__file__).resolve().parent.parent / "learning_log"
 MAX_RESULTS = 3
 
 
@@ -77,3 +80,49 @@ def get_lecture_summary(lecture: int) -> str:
         available = sorted(p.stem for p in (DATA_DIR / "lectures").glob("*.md"))
         return f"第{lecture}回の要点はまだありません。用意されている回: {', '.join(available)}"
     return path.read_text(encoding="utf-8")
+
+
+def make_quiz(lecture: int) -> str:
+    """指定した回の用語から1つ選び、意味を尋ねる確認問題と答えを返す。
+
+    「第2回の確認問題を出して」のように、復習用の問題を求められたときに使う。
+    """
+    terms = [term for term in load_glossary() if term["lecture"] == lecture]
+    if not terms:
+        return f"第{lecture}回の用語は用語集にありません。"
+
+    term = random.choice(terms)
+    return json.dumps(
+        {
+            "question": f"「{term['term']}」の意味は？",
+            "answer": term["definition"],
+        },
+        ensure_ascii=False,
+    )
+
+
+def save_learning_log(
+    question: str,
+    answer: str,
+    quiz_lecture: int | None = None,
+    quiz_content: str | None = None,
+) -> str:
+    """利用者がCLIで保存を承認した会話ログを日別JSONLに追記する。
+
+    クイズを作成した場合は quiz_lecture と quiz_content も指定する。
+    """
+    now = datetime.now().astimezone()
+    entry = {
+        "timestamp": now.isoformat(),
+        "question": question,
+        "answer": answer,
+    }
+    if quiz_lecture is not None and quiz_content is not None:
+        entry["quiz"] = f"クイズ作成：lecture{quiz_lecture} {quiz_content}"
+
+    LEARNING_LOG_DIR.mkdir(parents=True, exist_ok=True)
+    log_path = LEARNING_LOG_DIR / f"{now:%Y-%m-%d}.jsonl"
+    with log_path.open("a", encoding="utf-8") as log_file:
+        log_file.write(json.dumps(entry, ensure_ascii=False) + "\n")
+
+    return f"{log_path.name} に会話ログを保存しました。"
