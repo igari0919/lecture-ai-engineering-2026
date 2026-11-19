@@ -135,7 +135,14 @@ def search(query: str) -> list[dict]:
                    vec_distance_cosine(embedding, ?) AS distance
             FROM chunks ORDER BY distance, page_id LIMIT ?
         """, (sqlite_vec.serialize_float32(vector), RAG_TOP_K))
-        return [dict(row) for row in rows]
+        hits = [dict(row) for row in rows]
+    target = {(h["document_id"], h["page"] + d) for h in hits for d in (-1, 0, 1)}
+    dist = {h["page_id"]: h["distance"] for h in hits}
+    return [
+        {**p, "distance": dist.get(p["page_id"])}
+        for p in load_pages(RAG_SOURCE)
+        if (p["document_id"], p["page"]) in target
+    ]
 
 
 def search_graph(query: str) -> dict:
