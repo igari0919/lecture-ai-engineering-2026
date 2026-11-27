@@ -19,6 +19,7 @@ from app.mcp_agent import (
 )
 
 GLOSSARY_TOOL = "glossary_search_glossary"  # 設定ファイルのサーバー名 "glossary" が前に付く
+QUIZ_TOOL = "glossary_make_quiz"
 
 
 def _glossary_only_config(tmp_path):
@@ -42,6 +43,7 @@ def test_glossary_server_exposes_search_tool(tmp_path):
 
     offered = {t.name for t in model.last_model_request_parameters.function_tools}
     assert GLOSSARY_TOOL in offered  # 宿題でツールを足しても壊れないよう「含む」で判定
+    assert QUIZ_TOOL in offered
 
 
 def test_glossary_result_comes_back_through_mcp(tmp_path):
@@ -53,6 +55,16 @@ def test_glossary_result_comes_back_through_mcp(tmp_path):
     assert returns and returns[0].tool_name == GLOSSARY_TOOL
     assert str(returns[0].content).strip()  # 検索結果（または「見つかりませんでした」）が戻っている
     assert result.output
+
+
+def test_quiz_result_comes_back_through_mcp(tmp_path):
+    model = TestModel(call_tools=[QUIZ_TOOL])
+    result = build_mcp_agent(_glossary_only_config(tmp_path)).run_sync("第2回の確認問題を出して", model=model)
+
+    assert [p.tool_name for p in _parts(result, ToolCallPart)] == [QUIZ_TOOL]
+    returns = _parts(result, ToolReturnPart)
+    assert returns and returns[0].tool_name == QUIZ_TOOL
+    assert str(returns[0].content).strip()
 
 
 def test_describe_servers_tells_command_from_url(tmp_path):

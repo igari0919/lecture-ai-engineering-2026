@@ -1,4 +1,4 @@
-"""第6回: 用語集と各回の要点を MCP サーバーとして公開する。
+"""第6回: 用語集・各回の要点・確認問題を MCP サーバーとして公開する。
 
 使い方:
     uv run python -m app.mcp_agent --list-tools     # このサーバーが公開するツールを一覧する（APIキー不要）
@@ -21,11 +21,12 @@ from app import tools
 # サーバーの名前と説明。クライアントに表示される（設定ファイル側のキー "glossary" とは別物）
 server = MCPServer(
     "aie2026-glossary",
-    instructions="AIE2026（AIエンジニアリング実践講座）の用語集と各回の要点を提供する。",
+    instructions="AIE2026（AIエンジニアリング実践講座）の用語集、各回の要点、確認問題を提供する。",
 )
 
 # 第3回と同じ関数を、そのまま MCP のツールとして公開する。docstring と型ヒントが説明文になる
 server.tool()(tools.search_glossary)
+server.tool()(tools.make_quiz)
 
 # TODO(宿題・基礎): get_lecture_summary も公開しよう
 

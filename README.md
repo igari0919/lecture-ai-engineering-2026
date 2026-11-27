@@ -83,7 +83,7 @@ app/
   agent.py       第3回：Pydantic AI の学習支援エージェント（第5回：講義資料の検索を使う）
   judge.py       第4回：評価セットを LLM に採点させ、人のラベルとの一致率を出す
   retrieval.py   第5回：講義資料の検索・Tree探索・Graph探索・全文投入
-  mcp_server.py  第6回：用語集を公開する MCP サーバー
+  mcp_server.py  第6回：用語集と確認問題を公開する MCP サーバー
   mcp_agent.py   第6回：MCP サーバーのツールを使うエージェント（MCP クライアント）
   mcp_servers.json 第6回：使う MCP サーバーの設定（mcpServers 形式）
 data/
